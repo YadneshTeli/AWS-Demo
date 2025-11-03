@@ -396,7 +396,491 @@ Users can connect from multiple browsers, devices, or locations simultaneously a
 
 **Conclusion:** This application is designed to stay within AWS Free Tier indefinitely for personal/demo use and costs <$2/month even at 10K+ active users.
 
-## 📁 Project Structure
+## � Complete Deployment Guide
+
+### Prerequisites
+
+**System Requirements:**
+- Windows 10/11, macOS, or Linux
+- 2GB free disk space
+- Internet connection
+
+**Required Software:**
+- AWS Account ([Sign up for Free Tier](https://aws.amazon.com/free))
+- AWS CLI v2.x ([Download here](https://aws.amazon.com/cli))
+- Text editor (VS Code recommended)
+- Web browser (Chrome, Firefox, Safari, or Edge)
+
+**Optional Tools:**
+- Git for version control
+- `wscat` for WebSocket testing: `npm install -g wscat`
+- Postman for API testing
+
+### Step-by-Step Deployment
+
+#### 1. Configure AWS CLI
+
+```powershell
+# Verify AWS CLI installation
+aws --version
+# Expected: aws-cli/2.31.27 or newer
+
+# Configure credentials (get these from AWS Console → IAM → Users)
+aws configure
+# AWS Access Key ID: YOUR_ACCESS_KEY
+# AWS Secret Access Key: YOUR_SECRET_KEY
+# Default region name: ap-south-1
+# Default output format: json
+
+# Verify configuration
+aws sts get-caller-identity
+# Should display your Account ID and User ARN
+```
+
+#### 2. Create DynamoDB Tables (2 minutes)
+
+```powershell
+# Create ActiveConnections table
+aws dynamodb create-table `
+    --table-name ActiveConnections `
+    --attribute-definitions AttributeName=connectionId,AttributeType=S `
+    --key-schema AttributeName=connectionId,KeyType=HASH `
+    --billing-mode PAY_PER_REQUEST `
+    --region ap-south-1
+
+# Create MessageHistory table
+aws dynamodb create-table `
+    --table-name MessageHistory `
+    --attribute-definitions `
+        AttributeName=messageId,AttributeType=S `
+        AttributeName=timestamp,AttributeType=S `
+    --key-schema `
+        AttributeName=messageId,KeyType=HASH `
+        AttributeName=timestamp,KeyType=RANGE `
+    --billing-mode PAY_PER_REQUEST `
+    --region ap-south-1
+
+# Verify tables
+aws dynamodb list-tables --region ap-south-1
+```
+
+#### 3. Create IAM Role (3 minutes)
+
+```powershell
+# Create role with trust policy
+aws iam create-role `
+    --role-name ChatAppLambdaRole `
+    --assume-role-policy-document '{
+      "Version": "2012-10-17",
+      "Statement": [{
+        "Effect": "Allow",
+        "Principal": {"Service": "lambda.amazonaws.com"},
+        "Action": "sts:AssumeRole"
+      }]
+    }'
+
+# Attach CloudWatch Logs policy
+aws iam attach-role-policy `
+    --role-name ChatAppLambdaRole `
+    --policy-arn arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+# Create custom inline policy for DynamoDB + API Gateway
+aws iam put-role-policy `
+    --role-name ChatAppLambdaRole `
+    --policy-name ChatAppPermissions `
+    --policy-document '{
+      "Version": "2012-10-17",
+      "Statement": [
+        {
+          "Effect": "Allow",
+          "Action": [
+            "dynamodb:PutItem",
+            "dynamodb:GetItem",
+            "dynamodb:DeleteItem",
+            "dynamodb:Scan"
+          ],
+          "Resource": "arn:aws:dynamodb:ap-south-1:*:table/*"
+        },
+        {
+          "Effect": "Allow",
+          "Action": "execute-api:ManageConnections",
+          "Resource": "arn:aws:execute-api:ap-south-1:*:*/*"
+        }
+      ]
+    }'
+
+# Get role ARN (save this!)
+$ROLE_ARN = aws iam get-role --role-name ChatAppLambdaRole --query "Role.Arn" --output text
+Write-Host "Role ARN: $ROLE_ARN"
+```
+
+#### 4. Deploy Lambda Functions (5 minutes)
+
+```powershell
+cd lambda
+
+# Create ChatAppConnect
+Compress-Archive -Path connect.py -DestinationPath connect.zip -Force
+aws lambda create-function `
+    --function-name ChatAppConnect `
+    --runtime python3.9 `
+    --role $ROLE_ARN `
+    --handler connect.lambda_handler `
+    --zip-file fileb://connect.zip `
+    --timeout 30 `
+    --environment Variables={TABLE_NAME=ActiveConnections} `
+    --region ap-south-1
+
+# Create ChatAppDisconnect
+Compress-Archive -Path disconnect.py -DestinationPath disconnect.zip -Force
+aws lambda create-function `
+    --function-name ChatAppDisconnect `
+    --runtime python3.9 `
+    --role $ROLE_ARN `
+    --handler disconnect.lambda_handler `
+    --zip-file fileb://disconnect.zip `
+    --timeout 30 `
+    --environment Variables={TABLE_NAME=ActiveConnections} `
+    --region ap-south-1
+
+# Create ChatAppSendMessage
+Compress-Archive -Path sendmessage.py -DestinationPath sendmessage.zip -Force
+aws lambda create-function `
+    --function-name ChatAppSendMessage `
+    --runtime python3.9 `
+    --role $ROLE_ARN `
+    --handler sendmessage.lambda_handler `
+    --zip-file fileb://sendmessage.zip `
+    --timeout 30 `
+    --environment Variables={TABLE_NAME=ActiveConnections,HISTORY_TABLE_NAME=MessageHistory} `
+    --region ap-south-1
+
+# Create ChatAppDefault
+Compress-Archive -Path default.py -DestinationPath default.zip -Force
+aws lambda create-function `
+    --function-name ChatAppDefault `
+    --runtime python3.9 `
+    --role $ROLE_ARN `
+    --handler default.lambda_handler `
+    --zip-file fileb://default.zip `
+    --timeout 30 `
+    --region ap-south-1
+
+# Verify all functions
+aws lambda list-functions --region ap-south-1 --query "Functions[?contains(FunctionName,'ChatApp')].FunctionName"
+
+cd ..
+```
+
+#### 5. Create API Gateway WebSocket API (7 minutes)
+
+```powershell
+# Create API
+$API_ID = (aws apigatewayv2 create-api `
+    --name ChatAppWebSocketAPI `
+    --protocol-type WEBSOCKET `
+    --route-selection-expression '$request.body.action' `
+    --region ap-south-1 | ConvertFrom-Json).ApiId
+
+Write-Host "API ID: $API_ID"
+
+# Get Lambda ARNs
+$ACCOUNT_ID = (aws sts get-caller-identity --query Account --output text)
+$REGION = "ap-south-1"
+
+$CONNECT_ARN = "arn:aws:lambda:${REGION}:${ACCOUNT_ID}:function:ChatAppConnect"
+$DISCONNECT_ARN = "arn:aws:lambda:${REGION}:${ACCOUNT_ID}:function:ChatAppDisconnect"
+$SENDMESSAGE_ARN = "arn:aws:lambda:${REGION}:${ACCOUNT_ID}:function:ChatAppSendMessage"
+$DEFAULT_ARN = "arn:aws:lambda:${REGION}:${ACCOUNT_ID}:function:ChatAppDefault"
+
+# Create integrations
+$CONNECT_INT_ID = (aws apigatewayv2 create-integration --api-id $API_ID --integration-type AWS_PROXY --integration-uri $CONNECT_ARN --region ap-south-1 | ConvertFrom-Json).IntegrationId
+$DISCONNECT_INT_ID = (aws apigatewayv2 create-integration --api-id $API_ID --integration-type AWS_PROXY --integration-uri $DISCONNECT_ARN --region ap-south-1 | ConvertFrom-Json).IntegrationId
+$SENDMESSAGE_INT_ID = (aws apigatewayv2 create-integration --api-id $API_ID --integration-type AWS_PROXY --integration-uri $SENDMESSAGE_ARN --region ap-south-1 | ConvertFrom-Json).IntegrationId
+$DEFAULT_INT_ID = (aws apigatewayv2 create-integration --api-id $API_ID --integration-type AWS_PROXY --integration-uri $DEFAULT_ARN --region ap-south-1 | ConvertFrom-Json).IntegrationId
+
+# Create routes
+aws apigatewayv2 create-route --api-id $API_ID --route-key '$connect' --target "integrations/$CONNECT_INT_ID" --region ap-south-1
+aws apigatewayv2 create-route --api-id $API_ID --route-key '$disconnect' --target "integrations/$DISCONNECT_INT_ID" --region ap-south-1
+aws apigatewayv2 create-route --api-id $API_ID --route-key 'sendmessage' --target "integrations/$SENDMESSAGE_INT_ID" --region ap-south-1
+aws apigatewayv2 create-route --api-id $API_ID --route-key '$default' --target "integrations/$DEFAULT_INT_ID" --region ap-south-1
+
+# Create and deploy stage
+aws apigatewayv2 create-stage --api-id $API_ID --stage-name production --auto-deploy --region ap-south-1
+
+# Grant API Gateway permissions
+aws lambda add-permission --function-name ChatAppConnect --statement-id apigateway-connect --action lambda:InvokeFunction --principal apigateway.amazonaws.com --source-arn "arn:aws:execute-api:${REGION}:${ACCOUNT_ID}:${API_ID}/*" --region ap-south-1
+aws lambda add-permission --function-name ChatAppDisconnect --statement-id apigateway-disconnect --action lambda:InvokeFunction --principal apigateway.amazonaws.com --source-arn "arn:aws:execute-api:${REGION}:${ACCOUNT_ID}:${API_ID}/*" --region ap-south-1
+aws lambda add-permission --function-name ChatAppSendMessage --statement-id apigateway-sendmessage --action lambda:InvokeFunction --principal apigateway.amazonaws.com --source-arn "arn:aws:execute-api:${REGION}:${ACCOUNT_ID}:${API_ID}/*" --region ap-south-1
+aws lambda add-permission --function-name ChatAppDefault --statement-id apigateway-default --action lambda:InvokeFunction --principal apigateway.amazonaws.com --source-arn "arn:aws:execute-api:${REGION}:${ACCOUNT_ID}:${API_ID}/*" --region ap-south-1
+
+# Display WebSocket URL
+$WS_URL = "wss://${API_ID}.execute-api.ap-south-1.amazonaws.com/production"
+Write-Host "`nWebSocket URL: $WS_URL"
+Write-Host "IMPORTANT: Copy this URL for the next step!"
+```
+
+#### 6. Deploy Frontend to S3 (3 minutes)
+
+```powershell
+# Create S3 bucket (choose a unique name!)
+$BUCKET_NAME = "aws-chat-app-YOUR-NAME-2025"
+aws s3 mb s3://$BUCKET_NAME --region ap-south-1
+
+# Enable static website hosting
+aws s3 website s3://$BUCKET_NAME --index-document index.html
+
+# Update index.html with WebSocket URL
+# Open frontend/index.html in a text editor
+# Find line 32: <input type="text" id="wsUrl" value="wss://..." />
+# Replace with your WebSocket URL from step 5
+
+# Create bucket policy for public access
+$BUCKET_POLICY = @"
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Sid": "PublicReadGetObject",
+    "Effect": "Allow",
+    "Principal": "*",
+    "Action": "s3:GetObject",
+    "Resource": "arn:aws:s3:::${BUCKET_NAME}/*"
+  }]
+}
+"@
+
+# Disable block public access
+aws s3api delete-public-access-block --bucket $BUCKET_NAME
+
+# Apply bucket policy
+$BUCKET_POLICY | Out-File -FilePath bucket-policy-temp.json -Encoding utf8
+aws s3api put-bucket-policy --bucket $BUCKET_NAME --policy file://bucket-policy-temp.json
+Remove-Item bucket-policy-temp.json
+
+# Upload frontend files
+aws s3 cp frontend/index.html s3://$BUCKET_NAME/
+aws s3 cp frontend/app.js s3://$BUCKET_NAME/
+
+# Get website URL
+$WEBSITE_URL = "http://${BUCKET_NAME}.s3-website.ap-south-1.amazonaws.com"
+Write-Host "`n🎉 DEPLOYMENT COMPLETE! 🎉"
+Write-Host "Website URL: $WEBSITE_URL"
+Write-Host "Open this URL in your browser to start chatting!"
+```
+
+#### 7. Test Your Application (2 minutes)
+
+```powershell
+# Open website in browser
+Start-Process $WEBSITE_URL
+
+# Test with command line (optional)
+wscat -c "wss://${API_ID}.execute-api.ap-south-1.amazonaws.com/production"
+# Send: {"action":"sendmessage","message":"Test from CLI"}
+
+# Check DynamoDB messages
+aws dynamodb scan --table-name MessageHistory --region ap-south-1 --query "Count"
+
+# Check CloudWatch logs
+aws logs tail /aws/lambda/ChatAppSendMessage --follow --region ap-south-1
+```
+
+### Quick Commands for Updates
+
+```powershell
+# Update Lambda function
+cd lambda
+Compress-Archive -Path sendmessage.py -DestinationPath sendmessage.zip -Force
+aws lambda update-function-code --function-name ChatAppSendMessage --zip-file fileb://sendmessage.zip --region ap-south-1
+
+# Update frontend
+aws s3 cp frontend/index.html s3://YOUR-BUCKET-NAME/
+aws s3 cp frontend/app.js s3://YOUR-BUCKET-NAME/
+
+# View recent messages
+aws dynamodb scan --table-name MessageHistory --region ap-south-1 --query "Items[-5:].[message.S,timestamp.S]" --output table
+
+# Count active connections
+aws dynamodb scan --table-name ActiveConnections --region ap-south-1 --query "Count"
+```
+
+## 💻 Lambda Function Code Explained
+
+### connect.py - Connection Handler
+
+```python
+import json
+import boto3
+import os
+from datetime import datetime
+
+dynamodb = boto3.resource('dynamodb')
+table = dynamodb.Table(os.environ['TABLE_NAME'])
+
+def lambda_handler(event, context):
+    """
+    Triggered when a new WebSocket connection is established.
+    Saves the connection ID to DynamoDB for message broadcasting.
+    """
+    connection_id = event['requestContext']['connectionId']
+    
+    # Save connection to DynamoDB
+    table.put_item(Item={
+        'connectionId': connection_id,
+        'timestamp': datetime.now().isoformat(),
+        'connectedAt': int(datetime.now().timestamp())
+    })
+    
+    return {'statusCode': 200, 'body': 'Connected'}
+```
+
+**Key Points:**
+- Extracts `connectionId` from WebSocket event context
+- Stores connection with timestamp in ActiveConnections table
+- Returns 200 status code to acknowledge connection
+
+### disconnect.py - Disconnection Handler
+
+```python
+import json
+import boto3
+import os
+
+dynamodb = boto3.resource('dynamodb')
+table = dynamodb.Table(os.environ['TABLE_NAME'])
+
+def lambda_handler(event, context):
+    """
+    Triggered when a WebSocket connection is closed.
+    Removes the connection from DynamoDB to prevent stale broadcasts.
+    """
+    connection_id = event['requestContext']['connectionId']
+    
+    # Remove connection from DynamoDB
+    table.delete_item(Key={'connectionId': connection_id})
+    
+    return {'statusCode': 200, 'body': 'Disconnected'}
+```
+
+**Key Points:**
+- Removes connection ID from ActiveConnections table
+- Prevents attempting to send messages to closed connections
+- Automatic cleanup for graceful disconnections
+
+### sendmessage.py - Message Broadcasting
+
+```python
+import json
+import boto3
+import os
+from datetime import datetime
+import uuid
+
+dynamodb = boto3.resource('dynamodb')
+connections_table = dynamodb.Table(os.environ['TABLE_NAME'])
+history_table = dynamodb.Table(os.environ['HISTORY_TABLE_NAME'])
+
+def lambda_handler(event, context):
+    """
+    Handles incoming messages and broadcasts to all connected clients.
+    Also saves messages to MessageHistory for persistence.
+    """
+    connection_id = event['requestContext']['connectionId']
+    domain_name = event['requestContext']['domainName']
+    stage = event['requestContext']['stage']
+    
+    # Parse message from request body
+    body = json.loads(event['body'])
+    message = body.get('message', '')
+    
+    # Save message to history
+    history_table.put_item(Item={
+        'messageId': str(uuid.uuid4()),
+        'timestamp': datetime.now().isoformat(),
+        'connectionId': connection_id,
+        'message': message
+    })
+    
+    # Get all active connections
+    response = connections_table.scan()
+    connections = response['Items']
+    
+    # API Gateway Management API client
+    apigw_client = boto3.client(
+        'apigatewaymanagementapi',
+        endpoint_url=f'https://{domain_name}/{stage}'
+    )
+    
+    # Broadcast message to all connections
+    message_data = json.dumps({
+        'message': message,
+        'connectionId': connection_id,  # Full ID for color coding
+        'timestamp': datetime.now().isoformat()
+    })
+    
+    for connection in connections:
+        try:
+            apigw_client.post_to_connection(
+                ConnectionId=connection['connectionId'],
+                Data=message_data.encode('utf-8')
+            )
+        except apigw_client.exceptions.GoneException:
+            # Connection no longer exists, remove it
+            connections_table.delete_item(
+                Key={'connectionId': connection['connectionId']}
+            )
+    
+    return {'statusCode': 200, 'body': 'Message sent'}
+```
+
+**Key Points:**
+- Saves message to MessageHistory with UUID
+- Scans ActiveConnections for all recipients
+- Uses API Gateway Management API to broadcast
+- Handles stale connections with GoneException
+- Sends full connectionId for frontend color coding
+
+### default.py - Invalid Route Handler
+
+```python
+import json
+import boto3
+
+def lambda_handler(event, context):
+    """
+    Handles invalid or unrecognized WebSocket routes.
+    Returns error message to the client.
+    """
+    connection_id = event['requestContext']['connectionId']
+    domain_name = event['requestContext']['domainName']
+    stage = event['requestContext']['stage']
+    
+    apigw_client = boto3.client(
+        'apigatewaymanagementapi',
+        endpoint_url=f'https://{domain_name}/{stage}'
+    )
+    
+    error_message = json.dumps({
+        'error': 'Invalid action. Use "sendmessage" to send messages.'
+    })
+    
+    try:
+        apigw_client.post_to_connection(
+            ConnectionId=connection_id,
+            Data=error_message.encode('utf-8')
+        )
+    except Exception as e:
+        print(f"Error sending error message: {str(e)}")
+    
+    return {'statusCode': 400, 'body': 'Invalid route'}
+```
+
+**Key Points:**
+- Catches unrecognized actions in WebSocket messages
+- Sends helpful error message back to client
+- Returns 400 status code for invalid requests
+
+## 📂 Project Structure
 
 ```
 AWS-Demo/
