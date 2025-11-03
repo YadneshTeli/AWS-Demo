@@ -187,17 +187,17 @@ function displayMessage(data) {
     // Generate consistent color based on connectionId
     const colorIndex = data.connectionId ? data.connectionId.charCodeAt(0) % 6 : 0;
     const colors = [
-        { bg: 'from-indigo-500 to-purple-600', border: 'border-indigo-200', bgLight: 'bg-indigo-50' },
-        { bg: 'from-pink-500 to-rose-600', border: 'border-pink-200', bgLight: 'bg-pink-50' },
-        { bg: 'from-green-500 to-emerald-600', border: 'border-green-200', bgLight: 'bg-green-50' },
-        { bg: 'from-blue-500 to-cyan-600', border: 'border-blue-200', bgLight: 'bg-blue-50' },
-        { bg: 'from-orange-500 to-amber-600', border: 'border-orange-200', bgLight: 'bg-orange-50' },
-        { bg: 'from-violet-500 to-fuchsia-600', border: 'border-violet-200', bgLight: 'bg-violet-50' }
+        { bg: 'from-indigo-500 to-purple-600', border: 'border-indigo-300', bgLight: 'bg-indigo-100', text: 'text-indigo-800' },
+        { bg: 'from-pink-500 to-rose-600', border: 'border-pink-300', bgLight: 'bg-pink-100', text: 'text-pink-800' },
+        { bg: 'from-green-500 to-emerald-600', border: 'border-green-300', bgLight: 'bg-green-100', text: 'text-green-800' },
+        { bg: 'from-blue-500 to-cyan-600', border: 'border-blue-300', bgLight: 'bg-blue-100', text: 'text-blue-800' },
+        { bg: 'from-orange-500 to-amber-600', border: 'border-orange-300', bgLight: 'bg-orange-100', text: 'text-orange-800' },
+        { bg: 'from-violet-500 to-fuchsia-600', border: 'border-violet-300', bgLight: 'bg-violet-100', text: 'text-violet-800' }
     ];
     const userColor = colors[colorIndex];
     
     const messageDiv = document.createElement('div');
-    messageDiv.className = `slide-in ${userColor.bgLight} border ${userColor.border} rounded-lg p-2.5 mb-2 shadow-sm hover:shadow transition-shadow duration-200`;
+    messageDiv.className = `slide-in ${userColor.bgLight} border-2 ${userColor.border} rounded-lg p-2.5 mb-2 shadow-md hover:shadow-lg transition-all duration-200`;
     
     const headerDiv = document.createElement('div');
     headerDiv.className = 'flex items-center justify-between mb-1.5';
@@ -210,7 +210,7 @@ function displayMessage(data) {
     avatar.textContent = data.connectionId ? data.connectionId.substring(0, 2).toUpperCase() : 'SY';
     
     const userId = document.createElement('span');
-    userId.className = 'text-xs font-semibold text-gray-700';
+    userId.className = `text-xs font-bold ${userColor.text}`;
     userId.textContent = data.connectionId ? `User ${data.connectionId.substring(0, 8)}` : 'System';
     
     userDiv.appendChild(avatar);
@@ -230,7 +230,7 @@ function displayMessage(data) {
     headerDiv.appendChild(timeDiv);
     
     const contentDiv = document.createElement('div');
-    contentDiv.className = 'text-sm text-gray-800 break-words pl-7';
+    contentDiv.className = 'text-sm text-gray-900 font-medium break-words pl-7';
     contentDiv.textContent = data.message || JSON.stringify(data);
     
     messageDiv.appendChild(headerDiv);
