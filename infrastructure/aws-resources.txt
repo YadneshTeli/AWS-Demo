@@ -18,6 +18,21 @@
 - **ActiveConnections**: arn:aws:dynamodb:ap-south-1:324037308320:table/ActiveConnections
 - **MessageHistory**: arn:aws:dynamodb:ap-south-1:324037308320:table/MessageHistory
 
+## API Gateway WebSocket API
+- **API Name**: ChatAppWebSocket
+- **API ID**: 0k6ooykme9
+- **API Endpoint**: wss://0k6ooykme9.execute-api.ap-south-1.amazonaws.com
+- **Production Stage URL**: wss://0k6ooykme9.execute-api.ap-south-1.amazonaws.com/production
+- **Route Selection Expression**: $request.body.action
+- **Routes**: $connect, $disconnect, sendmessage, $default
+- **Stage**: production (auto-deploy enabled)
+
+## Lambda Functions
+- **ChatAppConnect**: arn:aws:lambda:ap-south-1:324037308320:function:ChatAppConnect
+- **ChatAppDisconnect**: arn:aws:lambda:ap-south-1:324037308320:function:ChatAppDisconnect
+- **ChatAppSendMessage**: arn:aws:lambda:ap-south-1:324037308320:function:ChatAppSendMessage
+- **ChatAppDefault**: arn:aws:lambda:ap-south-1:324037308320:function:ChatAppDefault
+
 ## Region
 - **Default Region**: ap-south-1 (Asia Pacific - Mumbai)
 

@@ -18,6 +18,9 @@ window.addEventListener('DOMContentLoaded', () => {
     const savedUrl = localStorage.getItem('websocketUrl');
     if (savedUrl) {
         websocketUrlInput.value = savedUrl;
+    } else {
+        // Default WebSocket URL for production
+        websocketUrlInput.value = 'wss://0k6ooykme9.execute-api.ap-south-1.amazonaws.com/production';
     }
 });
 
@@ -175,23 +178,35 @@ function sendMessage() {
  * Display chat message in UI
  */
 function displayMessage(data) {
-    // Clear placeholder if this is the first message
+    // Clear placeholder if this is the first message (only if it exists and is the only child)
     const placeholder = chatMessages.querySelector('.flex.items-center.justify-center');
-    if (placeholder) {
+    if (placeholder && chatMessages.children.length === 1) {
         chatMessages.innerHTML = '';
     }
     
+    // Generate consistent color based on connectionId
+    const colorIndex = data.connectionId ? data.connectionId.charCodeAt(0) % 6 : 0;
+    const colors = [
+        { bg: 'from-indigo-500 to-purple-600', border: 'border-indigo-200', bgLight: 'bg-indigo-50' },
+        { bg: 'from-pink-500 to-rose-600', border: 'border-pink-200', bgLight: 'bg-pink-50' },
+        { bg: 'from-green-500 to-emerald-600', border: 'border-green-200', bgLight: 'bg-green-50' },
+        { bg: 'from-blue-500 to-cyan-600', border: 'border-blue-200', bgLight: 'bg-blue-50' },
+        { bg: 'from-orange-500 to-amber-600', border: 'border-orange-200', bgLight: 'bg-orange-50' },
+        { bg: 'from-violet-500 to-fuchsia-600', border: 'border-violet-200', bgLight: 'bg-violet-50' }
+    ];
+    const userColor = colors[colorIndex];
+    
     const messageDiv = document.createElement('div');
-    messageDiv.className = 'slide-in bg-white border border-gray-200 rounded-lg p-4 mb-3 shadow-sm hover:shadow-md transition-shadow duration-200';
+    messageDiv.className = `slide-in ${userColor.bgLight} border ${userColor.border} rounded-lg p-2.5 mb-2 shadow-sm hover:shadow transition-shadow duration-200`;
     
     const headerDiv = document.createElement('div');
-    headerDiv.className = 'flex items-center justify-between mb-2';
+    headerDiv.className = 'flex items-center justify-between mb-1.5';
     
     const userDiv = document.createElement('div');
-    userDiv.className = 'flex items-center gap-2';
+    userDiv.className = 'flex items-center gap-1.5';
     
     const avatar = document.createElement('div');
-    avatar.className = 'w-8 h-8 rounded-full bg-gradient-to-r from-indigo-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold';
+    avatar.className = `w-6 h-6 rounded-full bg-gradient-to-r ${userColor.bg} flex items-center justify-center text-white text-xs font-bold`;
     avatar.textContent = data.connectionId ? data.connectionId.substring(0, 2).toUpperCase() : 'SY';
     
     const userId = document.createElement('span');
@@ -215,7 +230,7 @@ function displayMessage(data) {
     headerDiv.appendChild(timeDiv);
     
     const contentDiv = document.createElement('div');
-    contentDiv.className = 'text-sm text-gray-800 break-words';
+    contentDiv.className = 'text-sm text-gray-800 break-words pl-7';
     contentDiv.textContent = data.message || JSON.stringify(data);
     
     messageDiv.appendChild(headerDiv);
@@ -230,9 +245,9 @@ function displayMessage(data) {
  * Display system message
  */
 function displaySystemMessage(message, type = 'info') {
-    // Clear placeholder if this is the first message
+    // Clear placeholder if this is the first message (only if it exists and is the only child)
     const placeholder = chatMessages.querySelector('.flex.items-center.justify-center');
-    if (placeholder) {
+    if (placeholder && chatMessages.children.length === 1) {
         chatMessages.innerHTML = '';
     }
     
@@ -256,14 +271,14 @@ function displaySystemMessage(message, type = 'info') {
         icon = '✅';
     }
     
-    messageDiv.className = `slide-in ${bgColor} border rounded-lg p-3 mb-3 text-center`;
+    messageDiv.className = `slide-in ${bgColor} border rounded-lg p-2 mb-2 text-center`;
     
     const content = document.createElement('p');
     content.className = `text-xs font-medium ${textColor}`;
     content.textContent = `${icon} ${message}`;
     
     const time = document.createElement('span');
-    time.className = 'text-xs opacity-75 block mt-1';
+    time.className = 'text-xs opacity-75 block mt-0.5';
     time.textContent = new Date().toLocaleTimeString();
     
     messageDiv.appendChild(content);

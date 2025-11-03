@@ -62,7 +62,7 @@ def lambda_handler(event, context):
             'messageId': message_id,
             'timestamp': timestamp,
             'message': message,
-            'connectionId': connection_id[:8] + '...'  # Truncate for privacy
+            'connectionId': connection_id
         })
         
         # Broadcast to all connections
