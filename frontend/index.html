@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AWS Serverless Chat - Real-time WebSocket Application</title>
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Custom Tailwind Configuration -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#667eea',
+                        secondary: '#764ba2',
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        @keyframes pulse-slow {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .pulse-slow {
+            animation: pulse-slow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        
+        @keyframes slide-in {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .slide-in {
+            animation: slide-in 0.3s ease-out;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 min-h-screen">
+    
+    <div class="container mx-auto px-4 py-8 max-w-5xl">
+        
+        <!-- Header -->
+        <header class="bg-white rounded-2xl shadow-2xl p-8 mb-6 text-center">
+            <h1 class="text-4xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent mb-3">
+                AWS Serverless Chat Application
+            </h1>
+            <p class="text-gray-600 text-sm">
+                Real-time messaging powered by WebSocket API, Lambda & DynamoDB
+            </p>
+            <div class="mt-4 flex justify-center gap-2 flex-wrap">
+                <span class="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-xs font-semibold">API Gateway</span>
+                <span class="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-semibold">Lambda</span>
+                <span class="px-3 py-1 bg-pink-100 text-pink-700 rounded-full text-xs font-semibold">DynamoDB</span>
+                <span class="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-semibold">S3</span>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="bg-white rounded-2xl shadow-2xl overflow-hidden">
+            
+            <!-- Connection Section -->
+            <section class="p-6 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-gray-100">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center">
+                    <svg class="w-6 h-6 mr-2 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                    </svg>
+                    WebSocket Connection
+                </h2>
+                
+                <div class="space-y-4">
+                    <!-- WebSocket URL Input -->
+                    <div>
+                        <label for="websocketUrl" class="block text-sm font-medium text-gray-700 mb-2">
+                            WebSocket URL
+                        </label>
+                        <input 
+                            type="text" 
+                            id="websocketUrl" 
+                            placeholder="wss://your-api-id.execute-api.us-east-1.amazonaws.com/production"
+                            class="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 outline-none text-sm"
+                        >
+                    </div>
+                    
+                    <!-- Buttons -->
+                    <div class="flex gap-3">
+                        <button 
+                            id="connectBtn"
+                            class="flex-1 bg-gradient-to-r from-indigo-500 to-purple-600 text-white px-6 py-3 rounded-xl font-semibold hover:shadow-lg hover:scale-105 transition-all duration-200 flex items-center justify-center gap-2"
+                        >
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                            </svg>
+                            Connect
+                        </button>
+                        <button 
+                            id="disconnectBtn"
+                            disabled
+                            class="flex-1 bg-gradient-to-r from-red-500 to-pink-600 text-white px-6 py-3 rounded-xl font-semibold hover:shadow-lg hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-2"
+                        >
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                            </svg>
+                            Disconnect
+                        </button>
+                    </div>
+                    
+                    <!-- Status Indicator -->
+                    <div id="status" class="flex items-center gap-3 p-4 rounded-xl bg-red-50 border-2 border-red-200">
+                        <div class="flex items-center gap-2">
+                            <div class="w-3 h-3 rounded-full bg-red-500"></div>
+                            <span class="font-semibold text-red-700 text-sm" id="statusText">Disconnected</span>
+                        </div>
+                        <span class="text-red-600 text-xs ml-auto" id="statusDetails">No active connection</span>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- Chat Section -->
+            <section class="p-6">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center">
+                    <svg class="w-6 h-6 mr-2 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+                    </svg>
+                    Messages
+                </h2>
+                
+                <!-- Messages Container -->
+                <div 
+                    id="chatMessages" 
+                    class="h-96 overflow-y-auto bg-gradient-to-b from-gray-50 to-white border-2 border-gray-200 rounded-xl p-4 mb-4 scroll-smooth"
+                >
+                    <div class="flex items-center justify-center h-full text-gray-400">
+                        <div class="text-center">
+                            <svg class="w-16 h-16 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+                            </svg>
+                            <p class="text-sm">No messages yet. Connect and start chatting!</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Message Input -->
+                <div class="flex gap-3">
+                    <input 
+                        type="text" 
+                        id="messageInput" 
+                        placeholder="Type your message..."
+                        disabled
+                        class="flex-1 px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    >
+                    <button 
+                        id="sendBtn"
+                        disabled
+                        class="bg-gradient-to-r from-purple-500 to-pink-600 text-white px-8 py-3 rounded-xl font-semibold hover:shadow-lg hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center gap-2"
+                    >
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
+                        </svg>
+                        Send
+                    </button>
+                </div>
+            </section>
+        </main>
+
+        <!-- Footer -->
+        <footer class="mt-6 text-center text-white">
+            <p class="text-sm opacity-90">
+                Built with AWS Lambda, API Gateway WebSocket, DynamoDB & S3
+            </p>
+            <p class="text-xs mt-2 opacity-75">
+                100% Serverless • Scalable • Real-time
+            </p>
+        </footer>
+    </div>
+
+    <!-- JavaScript -->
+    <script src="app.js"></script>
+</body>
+</html>
