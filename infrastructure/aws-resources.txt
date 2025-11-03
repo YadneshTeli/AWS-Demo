@@ -1,0 +1,25 @@
+# AWS Resource Information
+
+## IAM Role
+- **Role Name**: ChatAppLambdaRole
+- **Role ARN**: arn:aws:iam::324037308320:role/ChatAppLambdaRole
+- **Created**: 2025-11-03
+
+## Attached Policies
+1. **AWSLambdaBasicExecutionRole** (AWS Managed)
+   - Allows Lambda to write logs to CloudWatch
+   
+2. **ChatAppLambdaPolicy** (Customer Managed)
+   - DynamoDB permissions: PutItem, DeleteItem, GetItem, Scan, Query
+   - Tables: ActiveConnections, MessageHistory
+   - API Gateway: ManageConnections for WebSocket
+
+## DynamoDB Tables
+- **ActiveConnections**: arn:aws:dynamodb:ap-south-1:324037308320:table/ActiveConnections
+- **MessageHistory**: arn:aws:dynamodb:ap-south-1:324037308320:table/MessageHistory
+
+## Region
+- **Default Region**: ap-south-1 (Asia Pacific - Mumbai)
+
+## Account ID
+- **AWS Account**: 324037308320

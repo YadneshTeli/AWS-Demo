@@ -6,7 +6,10 @@ dynamodb = boto3.resource('dynamodb')
 table = dynamodb.Table(os.environ.get('TABLE_NAME', 'ActiveConnections'))
 
 def lambda_handler(event, context):
-    """Handle WebSocket disconnection event"""
+    """
+    Handles WebSocket $disconnect route
+    Removes the connection ID from DynamoDB when a client disconnects
+    """
     connection_id = event['requestContext']['connectionId']
     
     try:
@@ -24,7 +27,7 @@ def lambda_handler(event, context):
             'body': json.dumps('Disconnected successfully')
         }
     except Exception as e:
-        print(f"Error disconnecting: {e}")
+        print(f"Error disconnecting: {str(e)}")
         return {
             'statusCode': 500,
             'body': json.dumps(f'Error: {str(e)}')
