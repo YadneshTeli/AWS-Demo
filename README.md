@@ -1146,16 +1146,19 @@ AWS-Demo/
 │   ├── disconnect.py       # Handle disconnections
 │   ├── sendmessage.py      # Broadcast messages to all clients
 │   ├── default.py          # Handle invalid routes
-│   ├── connect.zip
-│   ├── disconnect.zip
-│   ├── sendmessage.zip
-│   └── default.zip
+│   ├── connect.zip         # Packaged Lambda deployment
+│   ├── disconnect.zip      # Packaged Lambda deployment
+│   ├── sendmessage.zip     # Packaged Lambda deployment
+│   └── default.zip         # Packaged Lambda deployment
 ├── infrastructure/
 │   ├── trust-policy.json   # IAM trust policy for Lambda
 │   ├── bucket-policy.json  # S3 bucket public access policy
-│   └── aws-resources.txt   # Resource inventory
-├── .gitignore
-└── README.md
+│   └── aws-resources.txt   # Complete resource inventory with ARNs
+├── .gitignore              # Git ignore patterns
+├── LICENSE                 # MIT License
+├── CODE_OF_CONDUCT.md      # Community guidelines
+├── CONTRIBUTING.md         # Contribution guidelines
+└── README.md               # This file - comprehensive documentation
 ```
 
 ## 🎨 UI Features
@@ -1220,18 +1223,69 @@ AWS-Demo/
 - [ ] Deploy with CDN (CloudFront)
 - [ ] Add CI/CD pipeline
 
+## 🤝 Contributing
+
+Contributions are welcome! Please read our [Contributing Guidelines](CONTRIBUTING.md) and [Code of Conduct](CODE_OF_CONDUCT.md) before submitting pull requests.
+
+### How to Contribute
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'feat: Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines on:
+- Reporting bugs
+- Suggesting enhancements
+- Development setup
+- Coding standards
+- Testing procedures
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+### MIT License Summary
+
+- ✅ Commercial use
+- ✅ Modification
+- ✅ Distribution
+- ✅ Private use
+- ℹ️ License and copyright notice required
+- ⚠️ No warranty provided
+
 ## 👨‍💻 Developer
 
 **Yadnesh Teli**  
+Organization: Taskuick Solutions  
 AWS Account: 324037308320  
-Region: ap-south-1 (Mumbai)
+Region: ap-south-1 (Mumbai)  
+Email: yadneshteli@gmail.com  
+GitHub: [@YadneshTeli](https://github.com/YadneshTeli)
 
 ## 🙏 Acknowledgments
 
-- AWS Documentation
-- Tailwind CSS for beautiful styling
-- shadcn/ui for design inspiration
+- AWS Documentation for comprehensive service guides
+- Tailwind CSS for beautiful utility-first styling
+- shadcn/ui for design inspiration and patterns
+- Contributor Covenant for Code of Conduct template
+- The open-source community for inspiration
+
+## 📞 Support
+
+- 📧 Email: yadneshteli@gmail.com
+- 🐛 Issues: [GitHub Issues](https://github.com/YadneshTeli/AWS-Demo/issues)
+- 💬 Discussions: [GitHub Discussions](https://github.com/YadneshTeli/AWS-Demo/discussions)
+- 📖 Documentation: This README and [Wiki](https://github.com/YadneshTeli/AWS-Demo/wiki)
 
 ---
 
 **Built with ❤️ using AWS Serverless Technologies by Yadnesh Teli (Taskuick Solutions)**
+
+⭐ If you find this project helpful, please consider giving it a star on GitHub!
+
+[![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![AWS](https://img.shields.io/badge/AWS-Free%20Tier-orange.svg)](https://aws.amazon.com/free)
+[![Python](https://img.shields.io/badge/Python-3.9-blue.svg)](https://www.python.org/)
+[![Contributions Welcome](https://img.shields.io/badge/Contributions-Welcome-brightgreen.svg)](CONTRIBUTING.md)
